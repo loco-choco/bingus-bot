@@ -15,6 +15,7 @@ from ..lib.permissions import require_owner
 class Markov(commands.Cog):
     def __init__(self, bot: discord.bot.Bot):
         self.bot = bot
+        self.chain_max_lenght = 20
         self.reply_channels = [
             int(x) for x in os.getenv("Markov.REPLY_CHANNELS", "0").split(",")
         ]
@@ -74,7 +75,7 @@ class Markov(commands.Cog):
         self, ctx: discord.ApplicationContext, prompt: discord.Option(str)
     ):
         print("Bingus is responding!")
-        response = self.markov.respond(prompt)
+        response = self.markov.respond(prompt, self.chain_max_lenght)
         if response is not None and len(response) != 0:
             await ctx.respond(f"{prompt} {response[:1000]}")
         else:
@@ -157,6 +158,29 @@ class Markov(commands.Cog):
         await ctx.respond("> Bingus forgot everything!", ephemeral=True)
         await self.update_words()
 
+    @require_owner
+    @commands.slash_command()
+    async def set_chain_size(
+        self, ctx: discord.ApplicationContext, size: discord.Option(int)
+    ):
+        if size > 0:
+            self.chain_max_lenght = size
+            await ctx.respond(
+                f"> Bingus now can speak up to {size} tokens!", ephemeral=True
+            )
+        else:
+            await ctx.respond(
+                f"> You can't set the chain size to a value less or equal to 0!",
+                ephemeral=True,
+            )
+
+    @require_owner
+    @commands.slash_command()
+    async def get_chain_size(self, ctx: discord.ApplicationContext):
+        await ctx.respond(
+            f"> Bingus can speak up to {self.chain_max_lenght} tokens", ephemeral=True
+        )
+
     @commands.Cog.listener()
     async def on_ready(self):
         await self.update_words()
@@ -175,7 +199,7 @@ class Markov(commands.Cog):
 
         if msg.channel.id in self.reply_channels and random.randint(1, 100) <= chance:
             print("Bingus is responding!")
-            response = self.markov.respond(msg.content)
+            response = self.markov.respond(msg.content, self.chain_max_lenght)
             if response is not None and len(response) != 0:
                 await msg.channel.trigger_typing()
                 if msg.author.id == self.bot.application_id:
